@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graduate Network Jobs</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5d6673; --line: #e1e5ea;
+    --accent: #1f5fd1; --match: #137a3d; --check: #9a6700; --early: #6b7280; --late: #6b7280;
+    --match-bg: #e2f5e9; --check-bg: #fff3d6; --grey-bg: #eceef1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --card: #1c2026; --text: #e7eaee; --muted: #9aa4b1; --line: #2d333b;
+      --accent: #6ea0ff; --match: #5fd08a; --check: #f0c04d; --early: #9aa4b1; --late: #9aa4b1;
+      --match-bg: #16301f; --check-bg: #3a2f10; --grey-bg: #262b32;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 980px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .sub { color: var(--muted); margin: 0; }
+  main { max-width: 980px; margin: 0 auto; padding: 8px 16px 40px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-top: 12px; }
+  .drop { border: 2px dashed var(--line); text-align: center; padding: 22px 12px; border-radius: 10px; color: var(--muted); }
+  .drop.over { border-color: var(--accent); }
+  .drop button, label.btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+                            padding: 8px 14px; font: inherit; cursor: pointer; }
+  input[type=file] { display: none; }
+  .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  select, input[type=search] { font: inherit; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--line);
+                               background: var(--bg); color: var(--text); }
+  .checks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 14px; }
+  .checks label { display: flex; align-items: center; gap: 6px; }
+  .count { margin: 14px 2px 6px; color: var(--muted); }
+  .job { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .job h3 { margin: 0 0 2px; font-size: 16px; }
+  .job h3 a { color: var(--accent); text-decoration: none; }
+  .job h3 a:hover { text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--grey-bg); color: var(--muted); }
+  .tag.match { background: var(--match-bg); color: var(--match); font-weight: 600; }
+  .tag.check { background: var(--check-bg); color: var(--check); font-weight: 600; }
+  .why { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  footer { max-width: 980px; margin: 0 auto; padding: 0 16px 30px; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--accent); }
+  .empty { text-align: center; color: var(--muted); padding: 30px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Graduate Network Jobs</h1>
+  <p class="sub">Load the <code>results.csv</code> made by <code>search.py</code>. The file stays on your computer.</p>
+</header>
+<main>
+  <div class="panel">
+    <div class="drop" id="drop">
+      <p style="margin:0 0 10px">Drop <b>results.csv</b> here, or</p>
+      <label class="btn">Choose file<input type="file" id="file" accept=".csv,text/csv"></label>
+    </div>
+  </div>
+
+  <div class="panel" id="filterPanel" hidden>
+    <div class="filters">
+      <label>Search
+        <input type="search" id="q" placeholder="title, company, place">
+      </label>
+      <label>Country
+        <select id="country"></select>
+      </label>
+      <label>Fit for your year
+        <select id="fit">
+          <option value="useful">Match + check (recommended)</option>
+          <option value="match">Match only</option>
+          <option value="all">Everything</option>
+          <option value="too_early">Too early</option>
+          <option value="too_late">Too late</option>
+        </select>
+      </label>
+      <label>Type
+        <select id="kind"></select>
+      </label>
+      <label>Work pattern
+        <select id="wp"></select>
+      </label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="noClear"> Hide roles needing clearance or nationality</label>
+      <label><input type="checkbox" id="visa"> Only roles that mention visa sponsorship</label>
+    </div>
+  </div>
+
+  <div class="count" id="count"></div>
+  <div id="list"></div>
+</main>
+<footer>
+  Listings link to the original postings. Jobs by <a href="https://www.adzuna.co.uk" target="_blank" rel="noopener noreferrer">Adzuna</a>.
+</footer>
+
+<script>
+// ---- CSV parser (handles quotes, commas and newlines inside fields) ----
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", inQ = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const head = rows[0].map(h => h.trim());
+  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
+}
+
+// ---- state and helpers ----
+let jobs = [];
+const FIT_ORDER = { match: 0, check: 1, too_early: 2, too_late: 3 };
+const FIT_LABEL = { match: "Match", check: "Check dates", too_early: "Too early", too_late: "Too late" };
+const $ = id => document.getElementById(id);
+
+function safeUrl(u) { return /^https?:\/\//i.test(u) ? u : ""; }
+function fillSelect(sel, values, allLabel) {
+  sel.innerHTML = "";
+  const first = document.createElement("option"); first.value = ""; first.textContent = allLabel; sel.appendChild(first);
+  values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+}
+function uniq(key) { return [...new Set(jobs.map(j => j[key]).filter(Boolean))].sort(); }
+
+function load(text) {
+  jobs = parseCSV(text).filter(j => j.title);
+  if (!jobs.length) { $("count").textContent = "That file has no listings."; return; }
+  const countries = uniq("country");
+  countries.sort((a, b) => (a === "UK" ? -1 : b === "UK" ? 1 : a.localeCompare(b)));
+  fillSelect($("country"), countries, "All countries");
+  fillSelect($("kind"), uniq("kind"), "All types");
+  fillSelect($("wp"), uniq("work_pattern"), "Any pattern");
+  $("filterPanel").hidden = false;
+  render();
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const country = $("country").value, kind = $("kind").value, wp = $("wp").value, fit = $("fit").value;
+  const noClear = $("noClear").checked, visa = $("visa").checked;
+
+  const out = jobs.filter(j => {
+    if (fit === "useful" && !(j.fit === "match" || j.fit === "check")) return false;
+    if (["match", "too_early", "too_late"].includes(fit) && j.fit !== fit) return false;
+    if (country && j.country !== country) return false;
+    if (kind && j.kind !== kind) return false;
+    if (wp && j.work_pattern !== wp) return false;
+    if (noClear && String(j.clearance_or_nationality).toLowerCase() === "true") return false;
+    if (visa && j.visa !== "sponsors") return false;
+    if (q && !(j.title + " " + j.company + " " + j.location).toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) =>
+    (FIT_ORDER[a.fit] ?? 9) - (FIT_ORDER[b.fit] ?? 9) ||
+    (a.country === "UK" ? 0 : 1) - (b.country === "UK" ? 0 : 1) ||
+    (b.posted || "").localeCompare(a.posted || ""));
+
+  $("count").textContent = `${out.length} of ${jobs.length} listings`;
+  const list = $("list"); list.innerHTML = "";
+  if (!out.length) { const d = document.createElement("div"); d.className = "empty"; d.textContent = "No listings match these filters."; list.appendChild(d); return; }
+
+  out.forEach(j => {
+    const card = document.createElement("div"); card.className = "job";
+    const h = document.createElement("h3");
+    const href = safeUrl(j.url);
+    if (href) { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = j.title; h.appendChild(a); }
+    else h.textContent = j.title;
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = [j.company, j.location, j.country].filter(Boolean).join(" · ") + (j.posted ? `  ·  posted ${j.posted}` : "");
+    const tags = document.createElement("div"); tags.className = "tags";
+    const addTag = (t, cls) => { const s = document.createElement("span"); s.className = "tag" + (cls ? " " + cls : ""); s.textContent = t; tags.appendChild(s); };
+    addTag(FIT_LABEL[j.fit] || j.fit, j.fit === "match" ? "match" : j.fit === "check" ? "check" : "");
+    if (j.kind) addTag(j.kind);
+    if (j.work_pattern && j.work_pattern !== "unknown") addTag(j.work_pattern);
+    if (String(j.clearance_or_nationality).toLowerCase() === "true") addTag("clearance / nationality");
+    if (j.visa === "sponsors") addTag("visa sponsorship mentioned");
+    if (j.visa === "no") addTag("no sponsorship");
+    const why = document.createElement("div"); why.className = "why"; why.textContent = j.why || "";
+    card.append(h, meta, tags, why); list.appendChild(card);
+  });
+}
+
+// ---- wiring ----
+["q", "country", "fit", "kind", "wp", "noClear", "visa"].forEach(id => $(id).addEventListener("input", render));
+function readFile(f) { if (f) f.text().then(load); }
+$("file").addEventListener("change", e => readFile(e.target.files[0]));
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => readFile(e.dataTransfer.files[0]));
+</script>
+</body>
+</html>
